@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerente Dashboard</title>
+  <style>
+    body {
+      font-family: 'Poppins', Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+
+    header {
+      background-color: #FF5733;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #FF5733;
+      color: white;
+      padding: 10px;
+    }
+
+    td {
+      padding: 10px;
+      text-align: center;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+
+    tr:hover {
+      background-color: #ffe6e6;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+
+    <header>
+      <h1>Pedidos Dashboard</h1>
+    </header>
+
+  <main>
+    <div class="filter-section">
+      <input type="text" id="filter-sucursal" placeholder="Filtrar por sucursal">
+      <button id="filter-btn">Filtrar</button>
+    </div>
+
+    <h2>Pedidos Registrados</h2>
+
+    <table id="pedidos-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Sucursal</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Pedidos dinámicos -->
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+    const apiUrl = "/backend";  // Ruta configurada en Nginx
+    const socket = io("/backend", {
+    path: "/socket.io/",
+    transports: ["websocket", "polling"]
+});
+
+
+    // Obtener pedidos al hacer clic en el botón de filtrar
+    document.getElementById('filter-btn').addEventListener('click', fetchPedidos);
+
+    // Obtener pedidos al cargar la página
+    window.onload = fetchPedidos;
+
+    // Función para obtener los pedidos
+    async function fetchPedidos() {
+      const sucursal = document.getElementById('filter-sucursal').value;
+      try {
+        let url = `${apiUrl}/pedido`;
+        if (sucursal) {
+          url += `?sucursal=${sucursal}`;
+        }
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Error HTTP: ${response.status}`);
+        }
+        const pedidos = await response.json();
+        updateTable(pedidos);
+      } catch (error) {
+        console.error("❌ Error al obtener los pedidos", error);
+      }
+    }
+
+    // Función para actualizar la tabla con los pedidos
+    function updateTable(pedidos) {
+      const tableBody = document.getElementById('pedidos-table').querySelector('tbody');
+      tableBody.innerHTML = "";
+      pedidos.forEach((pedido, index) => {
+        addRow(pedido, index + 1);
+      });
+    }
+
+    // Función para agregar una fila a la tabla
+    function addRow(pedido, index) {
+      const tableBody = document.getElementById('pedidos-table').querySelector('tbody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${index}</td>
+        <td>${pedido.sucursal}</td>
+        <td>${pedido.producto}</td>
+        <td>${pedido.cantidad}</td>
+        <td>${pedido.fecha}</td>
+      `;
+      tableBody.appendChild(row);
+    }
+
+    // Escuchar actualizaciones de pedidos desde el backend
+    socket.on('actualizacion', (data) => {
+      console.log("📢 Nueva actualización recibida:", data);
+      
+      const sucursal = document.getElementById('filter-sucursal').value;
+      
+      // Si hay un filtro activo, solo agregar si coincide
+      if (!sucursal || sucursal === data.pedido.sucursal) {
+        const rowCount = document.querySelectorAll('#pedidos-table tbody tr').length;
+        addRow(data.pedido, rowCount + 1);
+      }
+    });
+
+    // Manejo de reconexión automática si falla WebSocket
+    socket.on("connect_error", () => {
+      console.log("🔴 Error en WebSocket. Intentando reconectar...");
+      setTimeout(() => {
+        socket.connect();
+      }, 5000);
+    });
+  </script>
+</body>
+</html>

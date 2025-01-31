@@ -1,0 +1,6 @@
+flask
+flask-cors
+kafka-python
+mysql-connector-python
+flask-socketio 
+eventlet
